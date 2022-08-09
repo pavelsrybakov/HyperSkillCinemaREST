@@ -1,9 +1,13 @@
 package cinema;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +21,42 @@ public class SeatsController {
         return cinemaRoom;
     }
 
+    @PostMapping("/purchase")
+    public ResponseEntity postSeat(@RequestBody Purchase purchase) {
+        // На минус надо тоже проверять оказывается
+        if (purchase.getColumn() > 9 || purchase.getRow() > 9 || purchase.getColumn() < 1 || purchase.getRow() < 1) {
+            return new ResponseEntity<>(new ApiError("The number of a row or a column is out of bounds!"), HttpStatus.BAD_REQUEST);
+        }
+        Seat seat = cinemaRoom.getAvailableSeats().get((purchase.getRow() - 1) * 9 + purchase.getColumn() - 1);
+        if (seat.isAvailable() == true) {
+            seat.setAvailable(false);
+        } else {
+            return new ResponseEntity<>(new ApiError("The ticket has been already purchased!"), HttpStatus.BAD_REQUEST);
+        }
+        return new ResponseEntity<>(seat, HttpStatus.OK);
+    }
+
+}
+
+class Purchase {
+    private int row;
+    private int column;
+
+    public int getRow() {
+        return row;
+    }
+
+    public int getColumn() {
+        return column;
+    }
+
+    public void setRow(int row) {
+        this.row = row;
+    }
+
+    public void setColumn(int column) {
+        this.column = column;
+    }
 }
 
 class cinemaRoom {
@@ -47,12 +87,15 @@ class Seat {
     private int row;
     private int column;
     private int price;
+    @JsonIgnore
     private boolean available;
 
 
     public Seat(int row, int column) {
         this.row = row;
         this.column = column;
+        this.price = row <= 4 ? 10 : 8;
+        this.available = true;
     }
     public int getRow() {
         return this.row;
@@ -60,5 +103,22 @@ class Seat {
     public int getColumn() {
         return this.column;
     }
+    public int getPrice() { return this.price; }
+    public boolean isAvailable() { return this.available; }
 
+    public void setAvailable(boolean available) {
+        this.available = available;
+    }
+
+
+}
+
+class ApiError {
+    private String error;
+    public ApiError(String error) {
+        this.error = error;
+    }
+    public String getError() {
+        return error;
+    }
 }
