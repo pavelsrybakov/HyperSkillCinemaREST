@@ -10,7 +10,9 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class SeatsController {
@@ -28,12 +30,25 @@ public class SeatsController {
             return new ResponseEntity<>(new ApiError("The number of a row or a column is out of bounds!"), HttpStatus.BAD_REQUEST);
         }
         Seat seat = cinemaRoom.getAvailableSeats().get((purchase.getRow() - 1) * 9 + purchase.getColumn() - 1);
+        UUID uuid;
         if (seat.isAvailable() == true) {
+            uuid = this.cinemaRoom.addToTickets(seat);
             seat.setAvailable(false);
         } else {
             return new ResponseEntity<>(new ApiError("The ticket has been already purchased!"), HttpStatus.BAD_REQUEST);
         }
-        return new ResponseEntity<>(seat, HttpStatus.OK);
+        return new ResponseEntity<>(new PurchasedTicket(uuid,seat), HttpStatus.OK);
+    }
+
+    @PostMapping("/return")
+    public ResponseEntity returnTicket(@RequestBody Token token) {
+        // Проверяем на наличие token в Hashmap tickets
+        UUID uuidToken = token.getToken();
+        if (this.cinemaRoom.checkToken(uuidToken)) {
+            Seat seat = this.cinemaRoom.removeTicket(uuidToken);
+            return new ResponseEntity<>(new ReturnedTicket(seat), HttpStatus.OK);
+        }
+        return new ResponseEntity<>(new ApiError("Wrong token!"), HttpStatus.BAD_REQUEST);
     }
 
 }
@@ -63,6 +78,8 @@ class cinemaRoom {
     private int totalRows;
     private int totalColumns;
     private List<Seat> seats = new ArrayList<>();
+
+    private HashMap<UUID, Seat> tickets = new HashMap<>();
     public cinemaRoom(int rows, int columns) {
         this.totalRows = rows;
         this.totalColumns = columns;
@@ -80,6 +97,25 @@ class cinemaRoom {
     }
     public int getTotalColumns() {
         return this.totalColumns;
+    }
+
+    public UUID addToTickets(Seat seat) {
+        UUID uuid = UUID.randomUUID();
+        tickets.put(uuid, seat);
+        return uuid;
+    }
+
+    public boolean checkToken(UUID token) {
+        return tickets.containsKey(token);
+    }
+
+    public Seat removeTicket(UUID token) {
+        // возвращаем место в пул доступных
+        Seat seat = tickets.get(token);
+        seat.setAvailable(true);
+        // удаляем билет из HashMap
+        tickets.remove(token);
+        return seat;
     }
 }
 
@@ -120,5 +156,42 @@ class ApiError {
     }
     public String getError() {
         return error;
+    }
+}
+
+class PurchasedTicket {
+    private UUID token;
+    private Seat ticket;
+    public PurchasedTicket(UUID uuid, Seat seat) {
+        this.token = uuid;
+        this.ticket = seat;
+    }
+    public UUID getToken() {
+        return this.token;
+    }
+    public Seat getTicket() {
+        return this.ticket;
+    }
+}
+
+class ReturnedTicket {
+    private Seat returnedTicket;
+    public ReturnedTicket (Seat seat) {
+        this.returnedTicket = seat;
+    }
+
+    public Seat getReturnedTicket() {
+        return returnedTicket;
+    }
+}
+
+class Token {
+    private UUID token;
+    public UUID getToken() {
+        return this.token;
+    }
+
+    public void setToken(UUID token) {
+        this.token = token;
     }
 }
