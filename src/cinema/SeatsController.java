@@ -51,6 +51,15 @@ public class SeatsController {
         return new ResponseEntity<>(new ApiError("Wrong token!"), HttpStatus.BAD_REQUEST);
     }
 
+
+    @PostMapping("/stats")
+    public ResponseEntity returnStatistics(@RequestParam(value = "password", required = false) String password) {
+        if (password == null || !password.equals("super_secret")) {
+            return new ResponseEntity<>(new ApiError("The password is wrong!"), HttpStatus.UNAUTHORIZED);
+        }
+        return new ResponseEntity(new Statistics(this.cinemaRoom), HttpStatus.OK);
+    }
+
 }
 
 class Purchase {
@@ -79,6 +88,7 @@ class cinemaRoom {
     private int totalColumns;
     private List<Seat> seats = new ArrayList<>();
 
+    @JsonIgnore
     private HashMap<UUID, Seat> tickets = new HashMap<>();
     public cinemaRoom(int rows, int columns) {
         this.totalRows = rows;
@@ -97,6 +107,10 @@ class cinemaRoom {
     }
     public int getTotalColumns() {
         return this.totalColumns;
+    }
+
+    public HashMap<UUID, Seat> getTickets() {
+        return this.tickets;
     }
 
     public UUID addToTickets(Seat seat) {
@@ -193,5 +207,30 @@ class Token {
 
     public void setToken(UUID token) {
         this.token = token;
+    }
+}
+
+class Statistics {
+    private int currentIncome;
+    private int numberOfAvailableSeats;
+    private int numberOfPurchasedTickets;
+    public Statistics(cinemaRoom cinemaRoom) {
+
+        HashMap<UUID, Seat> tickets = cinemaRoom.getTickets();
+        currentIncome = tickets.values().stream().mapToInt(Seat::getPrice).sum();
+        numberOfPurchasedTickets = (int) tickets.keySet().stream().count();
+        numberOfAvailableSeats = cinemaRoom.getTotalColumns() * cinemaRoom.getTotalColumns() - numberOfPurchasedTickets;
+    }
+
+    public int getCurrentIncome() {
+        return this.currentIncome;
+    }
+
+    public int getNumberOfAvailableSeats() {
+        return this.numberOfAvailableSeats;
+    }
+
+    public int getNumberOfPurchasedTickets() {
+        return this.numberOfPurchasedTickets;
     }
 }
